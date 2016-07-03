@@ -13,6 +13,10 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
+import ru.ussgroup.security.trusty.certpath.TrustyAsyncCertPathValidator;
+import ru.ussgroup.security.trusty.certpath.TrustyAsyncCertPathValidatorImpl;
+import ru.ussgroup.security.trusty.certpath.TrustyCachedCertPathValidator;
+import ru.ussgroup.security.trusty.certpath.TrustyCertPathValidatorImpl;
 import ru.ussgroup.security.trusty.exception.TrustyOCSPCertificateException;
 import ru.ussgroup.security.trusty.exception.TrustyOCSPNonceException;
 import ru.ussgroup.security.trusty.exception.TrustyOCSPNotAvailableException;
@@ -24,26 +28,20 @@ import ru.ussgroup.security.trusty.repository.TrustyKeyStoreRepository;
 import ru.ussgroup.security.trusty.repository.TrustyRepository;
 import ru.ussgroup.security.trusty.utils.ExceptionHandler;
 import ru.ussgroup.security.trusty.utils.SignedData;
+import ru.ussgroup.security.trusty.utils.VerifiedData;
 
 public class VerifySignatureExampleTest {
     private TrustySignatureVerifier signatureVerifier;
     
     @Before
-    public void init() {
+    public void init() throws UnknownHostException {
         TrustyRepository repository = new TrustyKeyStoreRepository("/ca/kalkan_repository.jks");
         
-        TrustyCertPathValidator certPathValidator = new TrustyCertPathValidator(repository);
+        TrustyAsyncCertPathValidator asyncCachedCertPathValidator = new TrustyAsyncCertPathValidatorImpl(new TrustyCachedCertPathValidator(new TrustyCertPathValidatorImpl(repository)));
         
-        TrustyOCSPValidator kalkanOCSPValidator;
-        try {
-            kalkanOCSPValidator = new KalkanOCSPValidator("http://ocsp.pki.gov.kz/ocsp/", "178.89.4.171", repository);
-        } catch (UnknownHostException e) {
-            throw new RuntimeException(e);
-        }
+        TrustyOCSPValidator cachedOCSPValidator = new TrustyCachedOCSPValidator(new KalkanOCSPValidator("http://ocsp.pki.gov.kz/ocsp/", "178.89.4.171", repository), repository, 5, 60);
         
-        TrustyOCSPValidator cachedOCSPValidator = new TrustyCachedOCSPValidator(kalkanOCSPValidator, 5, 60);
-        
-        TrustyCertificateValidator certificateValidator = new TrustyCertificateValidator(certPathValidator, cachedOCSPValidator);
+        TrustyCertificateValidator certificateValidator = new TrustyCertificateValidator(asyncCachedCertPathValidator, cachedOCSPValidator);
         
         signatureVerifier = new TrustySignatureVerifier(certificateValidator);
     }
@@ -62,8 +60,9 @@ public class VerifySignatureExampleTest {
             throw new RuntimeException(e);
         }
         
-        Future<List<SignedData>> future = signatureVerifier.verifyAsync(Arrays.asList(new SignedData(data, signature, cert.getCertificate()),
-                                                                                      new SignedData("qwe".getBytes(StandardCharsets.UTF_8), signature, cert.getCertificate())));
+        Future<List<VerifiedData>> future = signatureVerifier.verifyAsync(Arrays.asList(new SignedData(data, signature, cert.getCertificate()),
+                                                                                        new SignedData("qwe".getBytes(StandardCharsets.UTF_8), signature, cert.getCertificate())),
+                                                                                        cert.getCertificate().getNotBefore());
         
         try {
             ExceptionHandler.handleFutureResult(future);
@@ -73,7 +72,7 @@ public class VerifySignatureExampleTest {
             throw e;
         }
         
-        List<SignedData> results = future.get();
+        List<VerifiedData> results = future.get();
         
         Assert.assertTrue(results.get(0).isValid());
         Assert.assertFalse(results.get(1).isValid());
@@ -92,8 +91,9 @@ public class VerifySignatureExampleTest {
             throw new RuntimeException(e);
         }
         
-        List<SignedData> results = signatureVerifier.verify(Arrays.asList(new SignedData(data, signature, cert.getCertificate()),
-                                                                          new SignedData("qwe".getBytes(StandardCharsets.UTF_8), signature, cert.getCertificate())));
+        List<VerifiedData> results = signatureVerifier.verify(Arrays.asList(new SignedData(data, signature, cert.getCertificate()),
+                                                                            new SignedData("qwe".getBytes(StandardCharsets.UTF_8), signature, cert.getCertificate())),
+                                                                            cert.getCertificate().getNotBefore());
         
         Assert.assertTrue(results.get(0).isValid());
         Assert.assertFalse(results.get(1).isValid());

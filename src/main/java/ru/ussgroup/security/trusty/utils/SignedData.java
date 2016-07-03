@@ -4,7 +4,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.cert.X509Certificate;
 import java.util.Base64;
 
-import ru.ussgroup.security.trusty.TrustyCertValidationCode;
 import ru.ussgroup.security.trusty.TrustyUtils;
 
 public class SignedData {
@@ -15,10 +14,6 @@ public class SignedData {
     private byte[] signature;
     
     private X509Certificate cert;
-    
-    private boolean valid = true;
-    
-    private TrustyCertValidationCode certStatus;
     
     public SignedData(String data, String signature, X509Certificate cert) {
         this(null, data, signature, cert);
@@ -33,6 +28,7 @@ public class SignedData {
     }
     
     public SignedData(Object id, byte[] data, byte[] signature, X509Certificate cert) {
+        this.id = id;
         this.data = data;
         this.signature = signature;
         this.cert = cert;
@@ -50,22 +46,6 @@ public class SignedData {
         return cert;
     }
 
-    public boolean isValid() {
-        return valid;
-    }
-
-    public void setValid(boolean valid) {
-        this.valid = valid;
-    }
-    
-    public TrustyCertValidationCode getCertStatus() {
-        return certStatus;
-    }
-
-    public void setCertStatus(TrustyCertValidationCode certStatus) {
-        this.certStatus = certStatus;
-    }
-    
     public Object getId() {
         return id;
     }

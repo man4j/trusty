@@ -22,7 +22,7 @@ public class ExceptionHandler {
                 
                 throw e1;
             } catch (Throwable e1) {
-                throw new RuntimeException(e);
+                throw new RuntimeException(e1);
             }
         }
     }

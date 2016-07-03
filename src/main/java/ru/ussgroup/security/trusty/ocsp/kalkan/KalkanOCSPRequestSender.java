@@ -1,6 +1,7 @@
 package ru.ussgroup.security.trusty.ocsp.kalkan;
 
 import java.net.Inet4Address;
+import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.security.SecureRandom;
 import java.security.Security;
@@ -67,7 +68,7 @@ public class KalkanOCSPRequestSender {
     public KalkanOCSPRequestSender(String ocspUrl, String ip, TrustyRepository trustyRepository) throws UnknownHostException {
         this.ocspUrl = ocspUrl;
         this.trustyRepository = trustyRepository;
-        this.addr = (Inet4Address) Inet4Address.getByName(ip);
+        this.addr = (Inet4Address) InetAddress.getByName(ip);
     }
     
     public KalkanOCSPResponse sendRequest(Set<X509Certificate> certs) {
@@ -146,9 +147,5 @@ public class KalkanOCSPRequestSender {
         exts.put(OCSPObjectIdentifiers.id_pkix_ocsp_nonce, new X509Extension(false, new DEROctetString(new DEROctetString(nonce))));
         
         return new X509Extensions(exts);
-    }
-    
-    public TrustyRepository getRepository() {
-        return trustyRepository;
     }
 }

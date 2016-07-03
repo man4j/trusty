@@ -1,6 +1,5 @@
-package ru.ussgroup.security.trusty;
+package ru.ussgroup.security.trusty.certpath;
 
-import java.math.BigInteger;
 import java.security.SignatureException;
 import java.security.cert.CertPathValidator;
 import java.security.cert.CertPathValidatorException;
@@ -11,50 +10,22 @@ import java.security.cert.PKIXBuilderParameters;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
 import java.util.Date;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
+import ru.ussgroup.security.trusty.TrustyUtils;
 import ru.ussgroup.security.trusty.repository.TrustyRepository;
 
 /**
  * This class is thread-safe 
  */
-public class TrustyCertPathValidator {
-    private final TrustyRepository repository;
+public class TrustyCertPathValidatorImpl implements TrustyCertPathValidator {
+    final TrustyRepository repository;
     
-    public TrustyCertPathValidator(TrustyRepository repository) {
+    public TrustyCertPathValidatorImpl(TrustyRepository repository) {
         this.repository = repository;
     }
     
-    public CompletableFuture<Map<BigInteger, TrustyCertValidationCode>> validateAsync(Set<X509Certificate> certs) {
-        return validateAsync(certs, new Date());
-    }
-    
-    /**
-     * @param date null is disable expire date verification
-     */
-    public CompletableFuture<Map<BigInteger, TrustyCertValidationCode>> validateAsync(Set<X509Certificate> certs, Date date) {
-        return CompletableFuture.supplyAsync(() -> {
-            return certs.parallelStream().collect(Collectors.toConcurrentMap(X509Certificate::getSerialNumber, c -> {
-                try {
-                    validate(c, date);
-                    
-                    return TrustyCertValidationCode.SUCCESS;
-                } catch (CertificateNotYetValidException e) {
-                    return TrustyCertValidationCode.CERT_NOT_YET_VALID;
-                } catch (CertificateExpiredException e) {
-                    return TrustyCertValidationCode.CERT_EXPIRED;
-                } catch (SignatureException e) {
-                    return TrustyCertValidationCode.CERT_SIGNATURE_EXCEPTION;
-                } catch (CertPathValidatorException e) {
-                    return TrustyCertValidationCode.CERT_PATH_FAILED;
-                }
-            }));
-        });
-    }
-    
+    @Override
     public void validate(X509Certificate cert) throws CertificateNotYetValidException, CertificateExpiredException, SignatureException, CertPathValidatorException {
         validate(cert, new Date());
     }
@@ -62,6 +33,7 @@ public class TrustyCertPathValidator {
     /**
      * @param date null is disable expire date verification
      */
+    @Override
     public void validate(X509Certificate cert, Date date) throws CertificateNotYetValidException, CertificateExpiredException, SignatureException, CertPathValidatorException {
         try {
             PKIXBuilderParameters params = new PKIXBuilderParameters(repository.getTrustedCerts().stream().map(c -> new TrustAnchor(c, null)).collect(Collectors.toSet()), null);

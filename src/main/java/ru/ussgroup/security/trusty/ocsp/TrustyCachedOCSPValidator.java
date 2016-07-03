@@ -15,12 +15,7 @@ import java.util.concurrent.TimeUnit;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 
-import ru.ussgroup.security.trusty.exception.TrustyOCSPCertificateException;
-import ru.ussgroup.security.trusty.exception.TrustyOCSPNonceException;
-import ru.ussgroup.security.trusty.exception.TrustyOCSPNotAvailableException;
-import ru.ussgroup.security.trusty.exception.TrustyOCSPUnknownProblemException;
 import ru.ussgroup.security.trusty.repository.TrustyRepository;
-import ru.ussgroup.security.trusty.utils.ExceptionHandler;
 
 /**
  * This class is thread-safe
@@ -32,8 +27,11 @@ public class TrustyCachedOCSPValidator implements TrustyOCSPValidator {
     
     private final TrustyOCSPValidator validator;
     
-    public TrustyCachedOCSPValidator(TrustyOCSPValidator validator, int cachedTime, int trustedCachedTime) {
+    private final TrustyRepository repository;
+    
+    public TrustyCachedOCSPValidator(TrustyOCSPValidator validator, TrustyRepository repository, int cachedTime, int trustedCachedTime) {
         this.validator = validator;
+        this.repository = repository;
         certificateStatusCache = CacheBuilder.newBuilder().maximumSize(50_000)
                                                           .expireAfterWrite(cachedTime, TimeUnit.MINUTES)
                                                           .build();
@@ -45,7 +43,7 @@ public class TrustyCachedOCSPValidator implements TrustyOCSPValidator {
     
     @Override
     public CompletableFuture<TrustyOCSPValidationResult> validateAsync(Set<X509Certificate> certs) {
-        Map<BigInteger, TrustyOCSPStatus> statuses = new HashMap<>();
+        Map<BigInteger, TrustyOCSPStatus> cachedStatuses = new HashMap<>();
         
         Set<X509Certificate> toProcess = new HashSet<>(certs);
         
@@ -56,18 +54,20 @@ public class TrustyCachedOCSPValidator implements TrustyOCSPValidator {
             
             TrustyOCSPStatus status = trustedCertificateStatusCache.getIfPresent(checkedCert.getSerialNumber());
             
-            if (status == null) status = certificateStatusCache.getIfPresent(checkedCert.getSerialNumber());
+            if (status == null) {
+                status = certificateStatusCache.getIfPresent(checkedCert.getSerialNumber());
+            }
             
             if (status != null) {
-                statuses.put(checkedCert.getSerialNumber(), status);
+                cachedStatuses.put(checkedCert.getSerialNumber(), status);
                 it.remove();
             }
         }
         
         return validator.validateAsync(toProcess).thenApply(validationResult -> {
-            List<X509Certificate> trustedAndIntermediateCerts = new ArrayList<>(validator.getRepository().getTrustedCerts());
+            List<X509Certificate> trustedAndIntermediateCerts = new ArrayList<>(repository.getTrustedCerts());
             
-            trustedAndIntermediateCerts.addAll(validator.getRepository().getIntermediateCerts());
+            trustedAndIntermediateCerts.addAll(repository.getIntermediateCerts());
             
             Map<BigInteger, TrustyOCSPStatus> freshStatuses = validationResult.getStatuses();
             
@@ -87,19 +87,9 @@ public class TrustyCachedOCSPValidator implements TrustyOCSPValidator {
                 cache.put(checkedCert.getSerialNumber(), status);
             }
             
-            statuses.putAll(freshStatuses);
+            freshStatuses.putAll(cachedStatuses);
             
-            return new TrustyOCSPValidationResult(validationResult.getResponse(), statuses);
+            return new TrustyOCSPValidationResult(validationResult.getResponse(), freshStatuses);
         });
-    }
-
-    @Override
-    public TrustyOCSPValidationResult validate(Set<X509Certificate> certs) throws TrustyOCSPNotAvailableException, TrustyOCSPNonceException, TrustyOCSPCertificateException, TrustyOCSPUnknownProblemException {
-        return ExceptionHandler.handleFutureResult(validateAsync(certs));
-    }
-    
-    @Override
-    public TrustyRepository getRepository() {
-        return validator.getRepository();
     }
 }

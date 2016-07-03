@@ -10,9 +10,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class DnsResolver {
-    private static final Logger logger = LoggerFactory.getLogger(DnsResolver.class);
+    static final Logger logger = LoggerFactory.getLogger(DnsResolver.class);
     
-    private static ConcurrentHashMap<String, InetAddress> m = new ConcurrentHashMap<>();
+    static ConcurrentHashMap<String, InetAddress> m = new ConcurrentHashMap<>();
 
     static {
         Thread t = new Thread () {
@@ -29,7 +29,7 @@ public class DnsResolver {
                     
                     try {
                         Thread.sleep(10_000);
-                    } catch (InterruptedException e) {
+                    } catch (@SuppressWarnings("unused") InterruptedException e) {
                         interrupt();
                     }
                 }

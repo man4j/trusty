@@ -10,8 +10,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import kz.gov.pki.kalkan.asn1.ASN1InputStream;
+import kz.gov.pki.kalkan.asn1.ASN1OctetString;
 import kz.gov.pki.kalkan.asn1.DERObject;
-import kz.gov.pki.kalkan.asn1.DEROctetString;
 import kz.gov.pki.kalkan.asn1.ocsp.OCSPObjectIdentifiers;
 import kz.gov.pki.kalkan.jce.provider.KalkanProvider;
 import kz.gov.pki.kalkan.ocsp.BasicOCSPResp;
@@ -19,8 +19,10 @@ import kz.gov.pki.kalkan.ocsp.OCSPException;
 import kz.gov.pki.kalkan.ocsp.OCSPResp;
 import kz.gov.pki.kalkan.ocsp.RevokedStatus;
 import kz.gov.pki.kalkan.ocsp.SingleResp;
-import ru.ussgroup.security.trusty.TrustyCertPathValidator;
 import ru.ussgroup.security.trusty.TrustyUtils;
+import ru.ussgroup.security.trusty.certpath.TrustyCachedCertPathValidator;
+import ru.ussgroup.security.trusty.certpath.TrustyCertPathValidator;
+import ru.ussgroup.security.trusty.certpath.TrustyCertPathValidatorImpl;
 import ru.ussgroup.security.trusty.exception.TrustyOCSPCertificateException;
 import ru.ussgroup.security.trusty.exception.TrustyOCSPNonceException;
 import ru.ussgroup.security.trusty.exception.TrustyOCSPUnknownProblemException;
@@ -39,7 +41,7 @@ public class KalkanOCSPResponseChecker {
     }
     
     public KalkanOCSPResponseChecker(TrustyRepository trustyRepository) {
-        validator = new TrustyCertPathValidator(trustyRepository);
+        validator = new TrustyCachedCertPathValidator(new TrustyCertPathValidatorImpl(trustyRepository));
     }
 
     public TrustyOCSPValidationResult checkResponse(OCSPResp response, byte[] nonce) throws TrustyOCSPCertificateException, TrustyOCSPNonceException, TrustyOCSPUnknownProblemException {
@@ -62,11 +64,11 @@ public class KalkanOCSPResponseChecker {
                 try (ASN1InputStream asn1In1 = new ASN1InputStream(respNonceExt)) {
                     DERObject derObj = asn1In1.readObject();
                     
-                    byte[] extV = DEROctetString.getInstance(derObj).getOctets();
+                    byte[] extV = ASN1OctetString.getInstance(derObj).getOctets();
                     
                     try(ASN1InputStream asn1In2 = new ASN1InputStream(extV)) {
                         derObj = asn1In2.readObject();
-                        byte[] receivedNonce = DEROctetString.getInstance(derObj).getOctets();
+                        byte[] receivedNonce = ASN1OctetString.getInstance(derObj).getOctets();
                         if (!java.util.Arrays.equals(nonce, receivedNonce)) {
                             throw new TrustyOCSPNonceException("Expected nonce: " + Base64.getEncoder().encode(nonce) + ", but received: " + Base64.getEncoder().encode(receivedNonce));
                         }

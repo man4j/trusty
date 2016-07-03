@@ -18,6 +18,7 @@ import ru.ussgroup.security.trusty.exception.TrustyOCSPNotAvailableException;
 import ru.ussgroup.security.trusty.exception.TrustyOCSPUnknownProblemException;
 import ru.ussgroup.security.trusty.utils.ExceptionHandler;
 import ru.ussgroup.security.trusty.utils.SignedData;
+import ru.ussgroup.security.trusty.utils.VerifiedData;
 
 public class TrustySignatureVerifier {
     private TrustyCertificateValidator certificateValidator;
@@ -26,31 +27,33 @@ public class TrustySignatureVerifier {
         this.certificateValidator = certificateValidator;
     }
     
-    public List<SignedData> verify(List<SignedData> list) throws TrustyOCSPNotAvailableException, TrustyOCSPNonceException, TrustyOCSPCertificateException, TrustyOCSPUnknownProblemException {
+    public List<VerifiedData> verify(List<SignedData> list) throws TrustyOCSPNotAvailableException, TrustyOCSPNonceException, TrustyOCSPCertificateException, TrustyOCSPUnknownProblemException {
         return verify(list, new Date());
     }
     
     /**
      * @param date null is disable expire date verification
      */
-    public List<SignedData> verify(List<SignedData> list, Date date) throws TrustyOCSPNotAvailableException, TrustyOCSPNonceException, TrustyOCSPCertificateException, TrustyOCSPUnknownProblemException {
+    public List<VerifiedData> verify(List<SignedData> list, Date date) throws TrustyOCSPNotAvailableException, TrustyOCSPNonceException, TrustyOCSPCertificateException, TrustyOCSPUnknownProblemException {
         return ExceptionHandler.handleFutureResult(verifyAsync(list, date));
     }
     
-    public CompletableFuture<List<SignedData>> verifyAsync(List<SignedData> list) {
+    public CompletableFuture<List<VerifiedData>> verifyAsync(List<SignedData> list) {
         return verifyAsync(list, new Date());
     }
     
     /**
      * @param date null is disable expire date verification
      */
-    public CompletableFuture<List<SignedData>> verifyAsync(List<SignedData> list, Date date) {
+    public CompletableFuture<List<VerifiedData>> verifyAsync(List<SignedData> list, Date date) {
         Set<X509Certificate> certs = list.stream().map(SignedData::getCert).collect(Collectors.toSet());
         
         CompletableFuture<Map<BigInteger, TrustyCertValidationCode>> certResultsFuture = certificateValidator.validateAsync(certs, date);
         
-        CompletableFuture<List<SignedData>> dataResultsFuture = CompletableFuture.supplyAsync(() -> {
+        CompletableFuture<List<VerifiedData>> dataResultsFuture = CompletableFuture.supplyAsync(() -> {
             return list.parallelStream().map(sd -> {
+                VerifiedData vd = new VerifiedData(sd);
+                
                 try {
                     Signature s = Signature.getInstance(sd.getCert().getPublicKey().getAlgorithm());
                     
@@ -58,7 +61,7 @@ public class TrustySignatureVerifier {
                     s.update(sd.getData());
                     
                     if (!TrustyKeyUsageChecker.getKeyUsage(sd.getCert()).contains(TrustyKeyUsage.SIGNING)) {
-                        sd.setCertStatus(TrustyCertValidationCode.NOT_FOR_SIGNING);
+                        vd.setCertStatus(TrustyCertValidationCode.NOT_FOR_SIGNING);
                         throw new CertificateException();
                     }
                     
@@ -66,20 +69,20 @@ public class TrustySignatureVerifier {
                         throw new SignatureException();
                     }
                 } catch (Exception e) {
-                    sd.setValid(false);
+                    vd.setValid(false);
                 }
                 
-                return sd;
+                return vd;
             }).collect(Collectors.toList());
         });
         
         return dataResultsFuture.thenCombine(certResultsFuture, (dataResult, certResult) -> {
-            for (SignedData sd : dataResult) {
-                TrustyCertValidationCode code = certResult.get(sd.getCert().getSerialNumber());
+            for (VerifiedData vd : dataResult) {
+                TrustyCertValidationCode code = certResult.get(vd.getSignedData().getCert().getSerialNumber());
                 
                 if (code != TrustyCertValidationCode.SUCCESS) {
-                    sd.setValid(false);
-                    sd.setCertStatus(code);
+                    vd.setValid(false);
+                    vd.setCertStatus(code);
                 }
             }
             

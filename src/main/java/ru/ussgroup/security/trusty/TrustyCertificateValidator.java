@@ -12,6 +12,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
+import ru.ussgroup.security.trusty.certpath.TrustyAsyncCertPathValidator;
 import ru.ussgroup.security.trusty.exception.TrustyOCSPCertificateException;
 import ru.ussgroup.security.trusty.exception.TrustyOCSPNonceException;
 import ru.ussgroup.security.trusty.exception.TrustyOCSPNotAvailableException;
@@ -25,11 +26,11 @@ import ru.ussgroup.security.trusty.utils.ExceptionHandler;
  * This class is thread-safe 
  */
 public class TrustyCertificateValidator {
-    private TrustyCertPathValidator certPathValidator;
+    private TrustyAsyncCertPathValidator certPathValidator;
     
     private TrustyOCSPValidator ocspValidator;
 
-    public TrustyCertificateValidator(TrustyCertPathValidator certPathValidator, TrustyOCSPValidator ocspValidator) {
+    public TrustyCertificateValidator(TrustyAsyncCertPathValidator certPathValidator, TrustyOCSPValidator ocspValidator) {
         this.certPathValidator = certPathValidator;
         this.ocspValidator = ocspValidator;
     }

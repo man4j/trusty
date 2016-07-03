@@ -13,10 +13,12 @@ import org.junit.Test;
 
 import com.google.common.collect.ImmutableSet;
 
-import ru.ussgroup.security.trusty.TrustyCertPathValidator;
 import ru.ussgroup.security.trusty.TrustyCertificateValidator;
 import ru.ussgroup.security.trusty.TrustySignatureVerifier;
 import ru.ussgroup.security.trusty.TrustyUtils;
+import ru.ussgroup.security.trusty.certpath.TrustyAsyncCertPathValidator;
+import ru.ussgroup.security.trusty.certpath.TrustyAsyncCertPathValidatorImpl;
+import ru.ussgroup.security.trusty.certpath.TrustyCertPathValidatorImpl;
 import ru.ussgroup.security.trusty.exception.TrustyOCSPCertificateException;
 import ru.ussgroup.security.trusty.exception.TrustyOCSPNonceException;
 import ru.ussgroup.security.trusty.exception.TrustyOCSPNotAvailableException;
@@ -47,7 +49,7 @@ public class TrustyAsyncOCSPValidatorTest {
         
         TrustyRepository repository = new TrustyKeyStoreRepository("/ca/kalkan_repository.jks");
         
-        TrustyOCSPValidator validator = new TrustyCachedOCSPValidator(new KalkanOCSPValidator("http://ocsp.pki.gov.kz/ocsp/", "178.89.4.171", repository), 5, 60);
+        TrustyOCSPValidator validator = new TrustyCachedOCSPValidator(new KalkanOCSPValidator("http://ocsp.pki.gov.kz/ocsp/", "178.89.4.171", repository), repository, 5, 60);
         
         TrustyOCSPValidationResult result = validator.validateAsync(ImmutableSet.of(oldGostCert, oldRsaCert, oldRsaExpiredCert, oldRsaRevokedCert, newRsaCert, newGostCert)).get();
 
@@ -62,7 +64,7 @@ public class TrustyAsyncOCSPValidatorTest {
         
         Assert.assertEquals(TrustyOCSPStatus.GOOD,    result.getStatuses().get(nucGOST1.getSerialNumber()).getStatus());
         Assert.assertEquals(TrustyOCSPStatus.GOOD,    result.getStatuses().get(nucRSA1.getSerialNumber()).getStatus());
-        //Интересно почему статус UNKNOWN ? Похоже НУЦ не юзнает свои новые сертификаты.
+        //Интересно почему статус UNKNOWN ? Похоже НУЦ не узнает свои новые сертификаты.
         Assert.assertEquals(TrustyOCSPStatus.UNKNOWN, result.getStatuses().get(kucGOST.getSerialNumber()).getStatus());
         Assert.assertEquals(TrustyOCSPStatus.UNKNOWN, result.getStatuses().get(kucRSA.getSerialNumber()).getStatus());
         Assert.assertEquals(TrustyOCSPStatus.UNKNOWN, result.getStatuses().get(nucGOST2.getSerialNumber()).getStatus());
@@ -73,13 +75,11 @@ public class TrustyAsyncOCSPValidatorTest {
     public void shouldSyncVerifySignature() throws TrustyOCSPNotAvailableException, TrustyOCSPNonceException, TrustyOCSPCertificateException, TrustyOCSPUnknownProblemException, UnknownHostException {
         TrustyRepository repository = new TrustyKeyStoreRepository("/ca/kalkan_repository.jks");
         
-        TrustyCertPathValidator certPathValidator = new TrustyCertPathValidator(repository);
+        TrustyAsyncCertPathValidator certPathValidator = new TrustyAsyncCertPathValidatorImpl(new TrustyCertPathValidatorImpl(repository));
         
         TrustyOCSPValidator kalkanOCSPValidator = new KalkanOCSPValidator("http://1.1.1.1", "178.89.4.149", repository);
         
-        TrustyOCSPValidator cachedOCSPValidator = new TrustyCachedOCSPValidator(kalkanOCSPValidator, 5, 60);
-        
-        TrustyCertificateValidator certificateValidator = new TrustyCertificateValidator(certPathValidator, cachedOCSPValidator);
+        TrustyCertificateValidator certificateValidator = new TrustyCertificateValidator(certPathValidator, kalkanOCSPValidator);
         
         TrustySignatureVerifier signatureVerifier = new TrustySignatureVerifier(certificateValidator);
         

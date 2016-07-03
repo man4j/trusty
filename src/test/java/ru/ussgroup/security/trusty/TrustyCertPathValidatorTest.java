@@ -6,7 +6,6 @@ import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -14,53 +13,29 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import ru.ussgroup.security.trusty.certpath.TrustyCertPathValidatorImpl;
 import ru.ussgroup.security.trusty.repository.TrustyKeyStoreRepository;
 import ru.ussgroup.security.trusty.repository.TrustyRepository;
 
 //Если для загрузки сертификатов использовать провайдер Kalkan, то данные тесте не проходят.
 //Неужели глюки в Калкане?
 public class TrustyCertPathValidatorTest {
-    private static TrustyCertPathValidator validator;
+    private static TrustyCertPathValidatorImpl validator;
     
     @BeforeClass
     public static void initValidator() {
         TrustyRepository repository = new TrustyKeyStoreRepository("/ca/kalkan_repository.jks");
         
-        validator = new TrustyCertPathValidator(repository);
+        validator = new TrustyCertPathValidatorImpl(repository);
     }
     
     @Test(expected = SignatureException.class)
     public void shouldValidateCertificates() throws Throwable {
         X509Certificate oldGostCert = TrustyUtils.loadCredentialFromResources("/example/ul_gost_1.0.p12", "123456").getCertificate();
-        X509Certificate newGostCert = TrustyUtils.loadCredentialFromResources("/example/ul_gost_2.0.p12", "123456").getCertificate();
-        X509Certificate oldRsaCert = TrustyUtils.loadCredentialFromResources("/example/ul_rsa_1.0.p12", "123456").getCertificate();
-        X509Certificate newRsaCert = TrustyUtils.loadCredentialFromResources("/example/ul_rsa_2.0.p12", "123456").getCertificate();
         
-        validator.validate(oldGostCert);
-        validator.validate(newGostCert);
-        validator.validate(oldRsaCert);
-        validator.validate(newRsaCert);
+        validator.validate(oldGostCert, oldGostCert.getNotBefore());
         
-        byte[] bytes = oldGostCert.getEncoded();
-        
-        int index = 0;
-        
-        for (int i = 0; i < bytes.length; i++) {
-            byte b = bytes[i];
-            
-            if (b == (byte) '@') {
-                index = i;
-                break;
-            }
-        }
-        
-        bytes[index] = '$';//подделываем сертификат
-        
-        String base64 = new String(Base64.getEncoder().encode(bytes));
-        
-        X509Certificate cert = TrustyUtils.loadFromString(base64);
-        
-        validator.validate(cert);
+        validator.validate(FalsifyUtils.falsifyCert(oldGostCert), oldGostCert.getNotBefore());
     }
     
     @Test(expected = CertificateExpiredException.class)
@@ -105,7 +80,7 @@ public class TrustyCertPathValidatorTest {
         
         TrustyRepository repository = new TrustyKeyStoreRepository("/ca/kalkan_repository.jks");
         
-        TrustyCertPathValidator validator = new TrustyCertPathValidator(repository);
+        TrustyCertPathValidatorImpl validator = new TrustyCertPathValidatorImpl(repository);
         
         for (int i = 0; i < 1_00; i++) {
             Thread t = new Thread() {
@@ -113,7 +88,7 @@ public class TrustyCertPathValidatorTest {
                 public void run() {
                     try {
                         for (int i = 0; i < 1_000; i++) {
-                            validator.validate(cert);
+                            validator.validate(cert, cert.getNotBefore());
                         }
                     } catch (Exception e) {
                         successful.set(false);

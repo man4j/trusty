@@ -6,14 +6,9 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 import kz.gov.pki.kalkan.ocsp.OCSPResp;
-import ru.ussgroup.security.trusty.exception.TrustyOCSPCertificateException;
-import ru.ussgroup.security.trusty.exception.TrustyOCSPNonceException;
-import ru.ussgroup.security.trusty.exception.TrustyOCSPNotAvailableException;
-import ru.ussgroup.security.trusty.exception.TrustyOCSPUnknownProblemException;
 import ru.ussgroup.security.trusty.ocsp.TrustyOCSPValidationResult;
 import ru.ussgroup.security.trusty.ocsp.TrustyOCSPValidator;
 import ru.ussgroup.security.trusty.repository.TrustyRepository;
-import ru.ussgroup.security.trusty.utils.ExceptionHandler;
 
 /**
  * This class is thread-safe
@@ -39,15 +34,5 @@ public class KalkanOCSPValidator implements TrustyOCSPValidator {
                 throw new RuntimeException(e);
             }
         });
-    }
-
-    @Override
-    public TrustyOCSPValidationResult validate(Set<X509Certificate> certs) throws TrustyOCSPNotAvailableException, TrustyOCSPNonceException, TrustyOCSPCertificateException, TrustyOCSPUnknownProblemException {
-        return ExceptionHandler.handleFutureResult(validateAsync(certs));
-    }
-    
-    @Override
-    public TrustyRepository getRepository() {
-        return kalkanOCSPRequestSender.getRepository();
     }
 }
